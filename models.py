@@ -48,3 +48,20 @@ class Decoder(nn.Module):
         self.fc_out = nn.Linear(hid_dim, output_dim)
 
         self.dropout = nn.Dropout(dropout)
+
+        def forward(self, src):
+            # src = [src len, batch size]
+
+            embedded = self.dropout(self.embedding(src))
+
+            # embedded = [src len, batch size, emb dim]
+
+            outputs, (hidden, cell) = self.rnn(embedded)
+
+            # outputs = [src len, batch size, hid dim * n directions]
+            # hidden = [n layers * n directions, batch size, hid dim]
+            # cell = [n layers * n directions, batch size, hid dim]
+
+            # outputs are always from the top hidden layer
+
+            return hidden, cell
