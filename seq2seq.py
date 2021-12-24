@@ -8,12 +8,10 @@ from torchtext.legacy.data import Field, BucketIterator
 import spacy
 import numpy as np
 
-import random
-import math
-import time
+from models import *
 
 
-def seq2seq():
+def Seq2seq():
     SEED = 1234
 
     random.seed(SEED)
@@ -56,6 +54,26 @@ def seq2seq():
         batch_size=BATCH_SIZE,
         device=device)
 
+    INPUT_DIM = len(SRC.vocab)
+    OUTPUT_DIM = len(TRG.vocab)
+    ENC_EMB_DIM = 256
+    DEC_EMB_DIM = 256
+    HID_DIM = 512
+    N_LAYERS = 2
+    ENC_DROPOUT = 0.5
+    DEC_DROPOUT = 0.5
+
+    enc = Encoder(INPUT_DIM, ENC_EMB_DIM, HID_DIM, N_LAYERS, ENC_DROPOUT)
+    dec = Decoder(OUTPUT_DIM, DEC_EMB_DIM, HID_DIM, N_LAYERS, DEC_DROPOUT)
+
+    model = Seq2Seq(enc, dec, device).to(device)
+
+    def init_weights(m):
+        for name, param in m.named_parameters():
+            nn.init.uniform_(param.data, -0.08, 0.08)
+
+    model.apply(init_weights)
+
 
 if __name__ == '__main__':
-    seq2seq()
+    Seq2seq()

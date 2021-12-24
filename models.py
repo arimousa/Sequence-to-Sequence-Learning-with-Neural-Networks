@@ -1,34 +1,24 @@
 import torch
 import torch.nn as nn
+import random
 
 
 class Encoder(nn.Module):
     def __init__(self, input_dim, emb_dim, hid_dim, n_layers, dropout):
-        super().__init__()
+        super.__init__()
 
-        self.hid_dim = hid_dim
-        self.n_layers = n_layers
+        self.input_dim = input_dim
+        self.emb_dim = emb_dim
 
         self.embedding = nn.Embedding(input_dim, emb_dim)
-
         self.rnn = nn.LSTM(emb_dim, hid_dim, n_layers, dropout=dropout)
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, src):
-        # src = [src len, batch size]
-
-        embedded = self.dropout(self.embedding(src))
-
-        # embedded = [src len, batch size, emb dim]
+    def forward(self, scr):
+        embedded = self.dropout(self.embedding(scr))
 
         outputs, (hidden, cell) = self.rnn(embedded)
-
-        # outputs = [src len, batch size, hid dim * n directions]
-        # hidden = [n layers * n directions, batch size, hid dim]
-        # cell = [n layers * n directions, batch size, hid dim]
-
-        # outputs are always from the top hidden layer
 
         return hidden, cell
 
@@ -49,19 +39,47 @@ class Decoder(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-        def forward(self, src):
-            # src = [src len, batch size]
+    def forward(self, src):
+        embedded = self.dropout(self.embedding(src))
 
-            embedded = self.dropout(self.embedding(src))
+        output, (hidden, cell) = self.rnn(embedded)
 
-            # embedded = [src len, batch size, emb dim]
+        prediction = self.fc_out(output.squeeze(0))
 
-            outputs, (hidden, cell) = self.rnn(embedded)
+        return prediction, hidden, cell
 
-            # outputs = [src len, batch size, hid dim * n directions]
-            # hidden = [n layers * n directions, batch size, hid dim]
-            # cell = [n layers * n directions, batch size, hid dim]
 
-            # outputs are always from the top hidden layer
+class Seq2Seq(nn.Module):
+    def __init__(self, encoder, decoder, device):
+        super().__init__()
 
-            return hidden, cell
+        self.encoder = encoder
+        self.decoder = decoder
+        self.device = device
+
+        assert encoder.hid_dim == decoder.hid_dim, \
+            "Hidden dimensions of encoder and decoder must be equal!"
+        assert encoder.n_layers == decoder.n_layers, \
+            "Encoder and decoder must have equal number of layers!"
+
+    def forward(self, src, trg, teacher_forcing_ratio=0.5):
+        # src = [src len, batch size]
+        # trg = [trg len, batch size]
+
+        batch_size = trg[1]
+        trg_len = trg[0]
+        trg_vocab_size = self.decoder.output_dim
+
+        outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
+
+        hidden, cell = self.encoder(src)
+        input = trg[0, :]
+
+        for t in range(1, trg_len):
+            output, hidden, cell = self.decoder(input, hidden, cell)
+            teacher_force = random.random() < teacher_forcing_ratio
+
+            top1 = output.argmax(1)
+            input = trg[t] if teacher_force else top1
+
+        return outputs
