@@ -74,6 +74,17 @@ def Seq2seq():
 
     model.apply(init_weights)
 
+    def count_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    print(f'The model has {count_parameters(model):,} trainable parameters')
+
+    optimizer = optim.Adam(model.parameters())
+
+    TRG_PAD_IDX = TRG.vocab.stoi[TRG.pad_token]
+
+    criterion = nn.CrossEntropyLoss(ignore_index=TRG_PAD_IDX)
+
 
 if __name__ == '__main__':
     Seq2seq()
