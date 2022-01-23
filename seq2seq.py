@@ -7,8 +7,10 @@ from torchtext.legacy.data import Field, BucketIterator
 
 import spacy
 import numpy as np
+import math
 
 from models import *
+from evaluation import *
 
 
 def Seq2seq():
@@ -84,6 +86,61 @@ def Seq2seq():
     TRG_PAD_IDX = TRG.vocab.stoi[TRG.pad_token]
 
     criterion = nn.CrossEntropyLoss(ignore_index=TRG_PAD_IDX)
+
+    INPUT_DIM = len(SRC.vocab)
+    OUTPUT_DIM = len(TRG.vocab)
+    ENC_EMB_DIM = 256
+    DEC_EMB_DIM = 256
+    HID_DIM = 512
+    N_LAYERS = 2
+    ENC_DROPOUT = 0.5
+    DEC_DROPOUT = 0.5
+
+    enc = Encoder(INPUT_DIM, ENC_EMB_DIM, HID_DIM, N_LAYERS, ENC_DROPOUT)
+    dec = Decoder(OUTPUT_DIM, DEC_EMB_DIM, HID_DIM, N_LAYERS, DEC_DROPOUT)
+
+    model = Seq2Seq(enc, dec, device).to(device)
+
+    model.apply(init_weights)
+
+    TRG_PAD_IDX = TRG.vocab.stoi[TRG.pad_token]
+
+    criterion = nn.CrossEntropyLoss(ignore_index=TRG_PAD_IDX)
+
+    print(f'The model has {count_parameters(model):,} trainable parameters')
+
+    optimizer = optim.Adam(model.parameters())
+
+    N_EPOCHS = 10
+    CLIP = 1
+
+    best_valid_loss = float('inf')
+
+    for epoch in range(N_EPOCHS):
+
+        start_time = time.time()
+
+        train_loss = train(model, seq2seq.train_iterator, optimizer, criterion, CLIP)
+        valid_loss = evaluate(model, seq2seq.valid_iterator, criterion)
+
+        end_time = time.time()
+
+        epoch_mins, epoch_secs = epoch_time(start_time, end_time)
+
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            torch.save(model.state_dict(), 'tut1-model.pt')
+
+        print(f'Epoch: {epoch + 1:02} | Time: {epoch_mins}m {epoch_secs}s')
+        print(f'\tTrain Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}')
+        print(f'\t Val. Loss: {valid_loss:.3f} |  Val. PPL: {math.exp(valid_loss):7.3f}')
+
+
+    model.load_state_dict(torch.load('tut1-model.pt'))
+
+    test_loss = evaluate(model, test_iterator, criterion)
+
+    print(f'| Test Loss: {test_loss:.3f} | Test PPL: {math.exp(test_loss):7.3f} |')
 
 
 if __name__ == '__main__':
