@@ -8,9 +8,11 @@ from torchtext.legacy.data import Field, BucketIterator
 import spacy
 import numpy as np
 import math
+import time
 
 from models import *
 from evaluation import *
+from train_seq2seq import train
 
 
 def Seq2seq():
@@ -22,6 +24,8 @@ def Seq2seq():
     torch.cuda.manual_seed(SEED)
     torch.backends.cudnn.deterministic = True
 
+    spacy.cli.download("de_core_news_sm")
+    spacy.cli.download("en_core_web_sm")
     spacy_de = spacy.load('de_core_news_sm')
     spacy_en = spacy.load('en_core_web_sm')
 
@@ -32,7 +36,6 @@ def Seq2seq():
     def tokenize_en(text):
         # tokenize English text
         return [tok.text for tok in spacy_en.tokenizer(text)]
-
 
     # English
     SRC = Field(tokenize=tokenize_de,
@@ -55,6 +58,11 @@ def Seq2seq():
         (train_data, valid_data, test_data),
         batch_size=BATCH_SIZE,
         device=device)
+
+    SRC.build_vocab(train_data, min_freq=2)
+    TRG.build_vocab(train_data, min_freq=2)
+    print(f"Unique tokens in source (de) vocabulary: {len(SRC.vocab)}")
+    print(f"Unique tokens in target (en) vocabulary: {len(TRG.vocab)}")
 
     INPUT_DIM = len(SRC.vocab)
     OUTPUT_DIM = len(TRG.vocab)
@@ -87,15 +95,6 @@ def Seq2seq():
 
     criterion = nn.CrossEntropyLoss(ignore_index=TRG_PAD_IDX)
 
-    INPUT_DIM = len(SRC.vocab)
-    OUTPUT_DIM = len(TRG.vocab)
-    ENC_EMB_DIM = 256
-    DEC_EMB_DIM = 256
-    HID_DIM = 512
-    N_LAYERS = 2
-    ENC_DROPOUT = 0.5
-    DEC_DROPOUT = 0.5
-
     enc = Encoder(INPUT_DIM, ENC_EMB_DIM, HID_DIM, N_LAYERS, ENC_DROPOUT)
     dec = Decoder(OUTPUT_DIM, DEC_EMB_DIM, HID_DIM, N_LAYERS, DEC_DROPOUT)
 
@@ -120,8 +119,8 @@ def Seq2seq():
 
         start_time = time.time()
 
-        train_loss = train(model, seq2seq.train_iterator, optimizer, criterion, CLIP)
-        valid_loss = evaluate(model, seq2seq.valid_iterator, criterion)
+        train_loss = train(model, train_iterator, optimizer, criterion, CLIP)
+        valid_loss = evaluate(model, valid_iterator, criterion)
 
         end_time = time.time()
 
@@ -134,7 +133,6 @@ def Seq2seq():
         print(f'Epoch: {epoch + 1:02} | Time: {epoch_mins}m {epoch_secs}s')
         print(f'\tTrain Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}')
         print(f'\t Val. Loss: {valid_loss:.3f} |  Val. PPL: {math.exp(valid_loss):7.3f}')
-
 
     model.load_state_dict(torch.load('tut1-model.pt'))
 

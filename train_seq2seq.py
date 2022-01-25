@@ -1,19 +1,5 @@
-import seq2seq
-from seq2seq import *
-
-INPUT_DIM = len(seq2seq.SRC.vocab)
-OUTPUT_DIM = len(seq2seq.TRG.vocab)
-ENC_EMB_DIM = 256
-DEC_EMB_DIM = 256
-HID_DIM = 512
-N_LAYERS = 2
-ENC_DROPOUT = 0.5
-DEC_DROPOUT = 0.5
-
-enc = Encoder(INPUT_DIM, ENC_EMB_DIM, HID_DIM, N_LAYERS, ENC_DROPOUT)
-dec = Decoder(OUTPUT_DIM, DEC_EMB_DIM, HID_DIM, N_LAYERS, DEC_DROPOUT)
-
-model = Seq2Seq(enc, dec, seq2seq.device).to(seq2seq.device)
+import torch
+from torch import nn
 
 
 def init_weights(m):
@@ -21,14 +7,8 @@ def init_weights(m):
         nn.init.uniform_(param.data, -0.08, 0.08)
 
 
-
-
-
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
-
 
 
 def train(model, iterator, optimizer, criterion, clip):
